@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { McpCallContext } from "../../src/mcp/index"
+import { McpCallContext, makeMcpFetch } from "../../src/mcp/index"
+import { McpCallContext as Ctx } from "../../src/mcp/index"
 
 describe("McpCallContext", () => {
   test("getStore returns undefined outside run scope", () => {
@@ -60,5 +61,69 @@ describe("MCP.tools metadata", () => {
       5000,
     )
     expect((wrapped as any).__mcp).toEqual({ server: "metrics", tool: "query" })
+  })
+})
+
+describe("makeMcpFetch", () => {
+  test("delegates with unchanged init when no store is set", async () => {
+    let captured: { url: string | URL; init?: RequestInit } | undefined
+    const baseFetch = async (url: string | URL, init?: RequestInit) => {
+      captured = { url, init }
+      return new Response("ok")
+    }
+    const wrapped = makeMcpFetch("metrics", baseFetch)
+    await wrapped("https://example.com/", { headers: { "X-Static": "yes" } })
+    expect(captured?.init?.headers).toEqual({ "X-Static": "yes" })
+  })
+
+  test("merges store.headers on top of init.headers", async () => {
+    let captured: RequestInit | undefined
+    const baseFetch = async (_url: string | URL, init?: RequestInit) => {
+      captured = init
+      return new Response("ok")
+    }
+    const wrapped = makeMcpFetch("metrics", baseFetch)
+    await Ctx.run(
+      {
+        server: "metrics",
+        tool: "query",
+        sessionID: "sess-1",
+        callID: "call-1",
+        headers: { "X-Session-Id": "sess-1", Authorization: "Bearer NEW" },
+      },
+      async () => {
+        await wrapped("https://example.com/", {
+          headers: { Authorization: "Bearer OLD", "X-Static": "yes" },
+        })
+      },
+    )
+    expect(captured?.headers).toEqual({
+      Authorization: "Bearer NEW",
+      "X-Static": "yes",
+      "X-Session-Id": "sess-1",
+    })
+  })
+
+  test("accepts Headers instance in init and merges correctly", async () => {
+    let captured: RequestInit | undefined
+    const baseFetch = async (_url: string | URL, init?: RequestInit) => {
+      captured = init
+      return new Response("ok")
+    }
+    const wrapped = makeMcpFetch("metrics", baseFetch)
+    await Ctx.run(
+      {
+        server: "metrics",
+        tool: "query",
+        sessionID: "s",
+        callID: "c",
+        headers: { "X-A": "1" },
+      },
+      async () => {
+        const h = new Headers({ "X-B": "2" })
+        await wrapped("https://example.com/", { headers: h })
+      },
+    )
+    expect(captured?.headers).toEqual({ "X-A": "1", "x-b": "2" })
   })
 })

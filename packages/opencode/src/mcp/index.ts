@@ -46,6 +46,37 @@ export interface McpCallStore {
 
 export const McpCallContext = new AsyncLocalStorage<McpCallStore>()
 
+type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>
+
+function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> {
+  if (!headers) return {}
+  if (headers instanceof Headers) {
+    const out: Record<string, string> = {}
+    headers.forEach((value, key) => {
+      out[key] = value
+    })
+    return out
+  }
+  if (Array.isArray(headers)) {
+    const out: Record<string, string> = {}
+    for (const [k, v] of headers) out[k] = v
+    return out
+  }
+  return { ...(headers as Record<string, string>) }
+}
+
+export function makeMcpFetch(_server: string, base: FetchLike = fetch): FetchLike {
+  return async (url, init) => {
+    const store = McpCallContext.getStore()
+    if (!store) return base(url, init)
+    const merged: Record<string, string> = {
+      ...normalizeHeaders(init?.headers),
+      ...store.headers,
+    }
+    return base(url, { ...init, headers: merged })
+  }
+}
+
 const TolerantListToolsResultSchema = ListToolsResultSchema.extend({
   tools: ToolSchema.omit({ outputSchema: true }).array(),
 })
@@ -369,6 +400,7 @@ export const layer = Layer.effect(
           transport: new StreamableHTTPClientTransport(url, {
             authProvider,
             requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
+            fetch: makeMcpFetch(key),
           }),
         },
         {
@@ -376,6 +408,7 @@ export const layer = Layer.effect(
           transport: new SSEClientTransport(url, {
             authProvider,
             requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
+            fetch: makeMcpFetch(key),
           }),
         },
       ]
