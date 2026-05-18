@@ -274,6 +274,7 @@ Hook surface (mutate `output` in place; return `void`):
 - `event(input)`: every bus event
 - `config(cfg)`: once on init with the merged config
 - `chat.message`, `chat.params`, `chat.headers`
+- `mcp.call.before` — inject HTTP headers into outbound MCP `callTool` requests; receives `{ server, tool, sessionID, callID }`, mutates `output.headers` (pre-populated with config's static headers)
 - `tool.execute.before`, `tool.execute.after`
 - `tool.definition`
 - `command.execute.before`
