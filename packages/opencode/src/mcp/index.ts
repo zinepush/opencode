@@ -166,7 +166,8 @@ function listTools(key: string, client: MCPClient, timeout: number) {
 }
 
 // Convert MCP tool definition to AI SDK Tool type
-function convertMcpTool(
+/** @internal Exported for testing */
+export function convertMcpTool(
   mcpTool: MCPToolDef,
   server: string,
   client: MCPClient,
@@ -268,7 +269,7 @@ interface State {
 export interface Interface {
   readonly status: () => Effect.Effect<Record<string, Status>>
   readonly clients: () => Effect.Effect<Record<string, MCPClient>>
-  readonly tools: () => Effect.Effect<Record<string, Tool>>
+  readonly tools: () => Effect.Effect<Record<string, Tool & { __mcp?: { server: string; tool: string } }>>
   readonly prompts: () => Effect.Effect<Record<string, PromptInfo & { client: string }>>
   readonly resources: () => Effect.Effect<Record<string, ResourceInfo & { client: string }>>
   readonly add: (name: string, mcp: ConfigMCP.Info) => Effect.Effect<{ status: Record<string, Status> | Status }>
@@ -1005,4 +1006,3 @@ export const defaultLayer = layer.pipe(
 
 export * as MCP from "."
 
-export const __test__ = { convertMcpTool }

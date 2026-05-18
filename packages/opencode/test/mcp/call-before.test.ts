@@ -49,18 +49,16 @@ describe("McpCallContext", () => {
   })
 })
 
-import { describe as describeMeta, expect as expectMeta, test as testMeta } from "bun:test"
-
-describeMeta("MCP.tools metadata", () => {
-  testMeta("each tool carries __mcp = { server, tool }", async () => {
-    const { __test__ } = await import("../../src/mcp/index")
+describe("MCP.tools metadata", () => {
+  test("each tool carries __mcp = { server, tool }", async () => {
+    const { convertMcpTool } = await import("../../src/mcp/index")
     const fakeClient = { callTool: async () => ({ content: [] }) } as any
-    const wrapped = __test__.convertMcpTool(
+    const wrapped = convertMcpTool(
       { name: "query", description: "", inputSchema: { type: "object" } } as any,
       "metrics",
       fakeClient,
       5000,
     )
-    expectMeta((wrapped as any).__mcp).toEqual({ server: "metrics", tool: "query" })
+    expect((wrapped as any).__mcp).toEqual({ server: "metrics", tool: "query" })
   })
 })
