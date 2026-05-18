@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { McpCallContext, makeMcpFetch } from "../../src/mcp/index"
-import { McpCallContext as Ctx } from "../../src/mcp/index"
+import { McpCallContext, McpCallContext as Ctx, makeMcpFetch } from "../../src/mcp/index"
 
 describe("McpCallContext", () => {
   test("getStore returns undefined outside run scope", () => {
@@ -98,9 +97,9 @@ describe("makeMcpFetch", () => {
       },
     )
     expect(captured?.headers).toEqual({
-      Authorization: "Bearer NEW",
-      "X-Static": "yes",
-      "X-Session-Id": "sess-1",
+      authorization: "Bearer NEW",
+      "x-static": "yes",
+      "x-session-id": "sess-1",
     })
   })
 
@@ -124,6 +123,34 @@ describe("makeMcpFetch", () => {
         await wrapped("https://example.com/", { headers: h })
       },
     )
-    expect(captured?.headers).toEqual({ "X-A": "1", "x-b": "2" })
+    expect(captured?.headers).toEqual({ "x-a": "1", "x-b": "2" })
+  })
+
+  test("lowercases store keys when merging so plugin keys override init keys regardless of case", async () => {
+    let captured: RequestInit | undefined
+    const baseFetch = async (_url: string | URL, init?: RequestInit) => {
+      captured = init
+      return new Response("ok")
+    }
+    const wrapped = makeMcpFetch("metrics", baseFetch)
+    await Ctx.run(
+      {
+        server: "metrics",
+        tool: "query",
+        sessionID: "s",
+        callID: "c",
+        // Plugin uses mixed-case keys
+        headers: { "X-Session-Id": "from-plugin", Authorization: "Bearer NEW" },
+      },
+      async () => {
+        // SDK supplies the same logical header as a Headers instance (lowercase)
+        const h = new Headers({ "authorization": "Bearer OLD", "x-session-id": "from-sdk" })
+        await wrapped("https://example.com/", { headers: h })
+      },
+    )
+    expect(captured?.headers).toEqual({
+      authorization: "Bearer NEW",
+      "x-session-id": "from-plugin",
+    })
   })
 })

@@ -5,6 +5,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js"
+import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js"
 import {
   CallToolResultSchema,
   ListToolsResultSchema,
@@ -46,23 +47,19 @@ export interface McpCallStore {
 
 export const McpCallContext = new AsyncLocalStorage<McpCallStore>()
 
-type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>
-
 function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> {
   if (!headers) return {}
+  const out: Record<string, string> = {}
   if (headers instanceof Headers) {
-    const out: Record<string, string> = {}
-    headers.forEach((value, key) => {
-      out[key] = value
-    })
+    headers.forEach((value, key) => { out[key.toLowerCase()] = value })
     return out
   }
   if (Array.isArray(headers)) {
-    const out: Record<string, string> = {}
-    for (const [k, v] of headers) out[k] = v
+    for (const [k, v] of headers) out[k.toLowerCase()] = v
     return out
   }
-  return { ...(headers as Record<string, string>) }
+  for (const [k, v] of Object.entries(headers)) out[k.toLowerCase()] = v
+  return out
 }
 
 export function makeMcpFetch(_server: string, base: FetchLike = fetch): FetchLike {
@@ -71,7 +68,7 @@ export function makeMcpFetch(_server: string, base: FetchLike = fetch): FetchLik
     if (!store) return base(url, init)
     const merged: Record<string, string> = {
       ...normalizeHeaders(init?.headers),
-      ...store.headers,
+      ...normalizeHeaders(store.headers),
     }
     return base(url, { ...init, headers: merged })
   }
