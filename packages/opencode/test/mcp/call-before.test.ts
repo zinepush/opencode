@@ -29,20 +29,14 @@ describe("McpCallContext", () => {
   test("concurrent run scopes do not leak between callbacks", async () => {
     const seen: Array<string | undefined> = []
     await Promise.all([
-      McpCallContext.run(
-        { server: "a", tool: "t", sessionID: "s", callID: "c-a", headers: {} },
-        async () => {
-          await new Promise((r) => setTimeout(r, 5))
-          seen.push(McpCallContext.getStore()?.callID)
-        },
-      ),
-      McpCallContext.run(
-        { server: "b", tool: "t", sessionID: "s", callID: "c-b", headers: {} },
-        async () => {
-          seen.push(McpCallContext.getStore()?.callID)
-          await new Promise((r) => setTimeout(r, 1))
-        },
-      ),
+      McpCallContext.run({ server: "a", tool: "t", sessionID: "s", callID: "c-a", headers: {} }, async () => {
+        await new Promise((r) => setTimeout(r, 5))
+        seen.push(McpCallContext.getStore()?.callID)
+      }),
+      McpCallContext.run({ server: "b", tool: "t", sessionID: "s", callID: "c-b", headers: {} }, async () => {
+        seen.push(McpCallContext.getStore()?.callID)
+        await new Promise((r) => setTimeout(r, 1))
+      }),
     ])
     expect(new Set(seen)).toEqual(new Set(["c-a", "c-b"]))
     expect(McpCallContext.getStore()).toBeUndefined()
@@ -144,7 +138,7 @@ describe("makeMcpFetch", () => {
       },
       async () => {
         // SDK supplies the same logical header as a Headers instance (lowercase)
-        const h = new Headers({ "authorization": "Bearer OLD", "x-session-id": "from-sdk" })
+        const h = new Headers({ authorization: "Bearer OLD", "x-session-id": "from-sdk" })
         await wrapped("https://example.com/", { headers: h })
       },
     )

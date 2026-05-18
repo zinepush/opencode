@@ -51,7 +51,9 @@ function normalizeHeaders(headers: HeadersInit | undefined): Record<string, stri
   if (!headers) return {}
   const out: Record<string, string> = {}
   if (headers instanceof Headers) {
-    headers.forEach((value, key) => { out[key.toLowerCase()] = value })
+    headers.forEach((value, key) => {
+      out[key.toLowerCase()] = value
+    })
     return out
   }
   if (Array.isArray(headers)) {
@@ -750,7 +752,12 @@ export const layer = Layer.effect(
 
             const timeout = entry?.timeout ?? defaultTimeout
             for (const mcpTool of listed) {
-              result[sanitize(clientName) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, clientName, client, timeout)
+              result[sanitize(clientName) + "_" + sanitize(mcpTool.name)] = convertMcpTool(
+                mcpTool,
+                clientName,
+                client,
+                timeout,
+              )
             }
           }),
         { concurrency: "unbounded" },
@@ -1035,4 +1042,3 @@ export const defaultLayer = layer.pipe(
 )
 
 export * as MCP from "."
-
