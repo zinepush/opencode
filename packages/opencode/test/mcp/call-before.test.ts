@@ -64,7 +64,7 @@ describe("makeMcpFetch", () => {
       captured = { url, init }
       return new Response("ok")
     }
-    const wrapped = makeMcpFetch("metrics", baseFetch)
+    const wrapped = makeMcpFetch(baseFetch)
     await wrapped("https://example.com/", { headers: { "X-Static": "yes" } })
     expect(captured?.init?.headers).toEqual({ "X-Static": "yes" })
   })
@@ -75,7 +75,7 @@ describe("makeMcpFetch", () => {
       captured = init
       return new Response("ok")
     }
-    const wrapped = makeMcpFetch("metrics", baseFetch)
+    const wrapped = makeMcpFetch(baseFetch)
     await Ctx.run(
       {
         server: "metrics",
@@ -103,7 +103,7 @@ describe("makeMcpFetch", () => {
       captured = init
       return new Response("ok")
     }
-    const wrapped = makeMcpFetch("metrics", baseFetch)
+    const wrapped = makeMcpFetch(baseFetch)
     await Ctx.run(
       {
         server: "metrics",
@@ -126,7 +126,7 @@ describe("makeMcpFetch", () => {
       captured = init
       return new Response("ok")
     }
-    const wrapped = makeMcpFetch("metrics", baseFetch)
+    const wrapped = makeMcpFetch(baseFetch)
     await Ctx.run(
       {
         server: "metrics",
@@ -145,6 +145,39 @@ describe("makeMcpFetch", () => {
     expect(captured?.headers).toEqual({
       authorization: "Bearer NEW",
       "x-session-id": "from-plugin",
+    })
+  })
+
+  test("when store.headers omits a key, init.headers's value is preserved", async () => {
+    let captured: RequestInit | undefined
+    const baseFetch = async (_url: string | URL, init?: RequestInit) => {
+      captured = init
+      return new Response("ok")
+    }
+    const wrapped = makeMcpFetch(baseFetch)
+    await Ctx.run(
+      {
+        server: "metrics",
+        tool: "query",
+        sessionID: "s",
+        callID: "c",
+        // Plugin "deleted" the Authorization key by not including it in resolved headers
+        headers: { "x-session-id": "s" },
+      },
+      async () => {
+        // SDK supplied init contains a static-config Authorization header
+        await wrapped("https://example.com/", { headers: { authorization: "Bearer FROM-STATIC" } })
+      },
+    )
+    // Implementation note: makeMcpFetch only merges store keys on top of init keys.
+    // It does NOT actively delete keys present in init but absent from store. That
+    // deletion semantic is handled upstream in prompt.ts (the plugin can delete
+    // keys from output.headers, which means they won't appear in store.headers).
+    // This test exercises only the merge behavior: a key in init that is not
+    // shadowed by store stays as-is.
+    expect(captured?.headers).toEqual({
+      authorization: "Bearer FROM-STATIC",
+      "x-session-id": "s",
     })
   })
 })

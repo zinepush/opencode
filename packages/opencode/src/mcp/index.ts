@@ -37,6 +37,7 @@ import { AsyncLocalStorage } from "node:async_hooks"
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
 
+/** @internal Exported for testing */
 export interface McpCallStore {
   server: string
   tool: string
@@ -45,6 +46,7 @@ export interface McpCallStore {
   headers: Record<string, string>
 }
 
+/** @internal Exported for testing */
 export const McpCallContext = new AsyncLocalStorage<McpCallStore>()
 
 function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> {
@@ -64,7 +66,8 @@ function normalizeHeaders(headers: HeadersInit | undefined): Record<string, stri
   return out
 }
 
-export function makeMcpFetch(_server: string, base: FetchLike = fetch): FetchLike {
+/** @internal Exported for testing */
+export function makeMcpFetch(base: FetchLike = fetch): FetchLike {
   return async (url, init) => {
     const store = McpCallContext.getStore()
     if (!store) return base(url, init)
@@ -399,7 +402,7 @@ export const layer = Layer.effect(
           transport: new StreamableHTTPClientTransport(url, {
             authProvider,
             requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
-            fetch: makeMcpFetch(key),
+            fetch: makeMcpFetch(),
           }),
         },
         {
@@ -407,7 +410,7 @@ export const layer = Layer.effect(
           transport: new SSEClientTransport(url, {
             authProvider,
             requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
-            fetch: makeMcpFetch(key),
+            fetch: makeMcpFetch(),
           }),
         },
       ]

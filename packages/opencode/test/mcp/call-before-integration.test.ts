@@ -108,7 +108,7 @@ describe("mcp.call.before integration", () => {
           fetchCalls.push(init)
           return new Response("ok")
         }
-        const wrapped = makeMcpFetch("metrics", stubFetch)
+        const wrapped = makeMcpFetch(stubFetch)
 
         yield* Effect.promise(() =>
           McpCallContext.run(
@@ -128,6 +128,66 @@ describe("mcp.call.before integration", () => {
           authorization: "Bearer T",
           "x-session-id": "sess-1",
           "x-static-header": "preset",
+        })
+      }),
+    ),
+  )
+
+  it.live("headers mutated before a plugin throw still reach the transport fetch wrapper", () =>
+    withProject(
+      [
+        "export default async () => ({",
+        '  "mcp.call.before": async (_input, output) => {',
+        '    output.headers["x-from-plugin"] = "before-throw"',
+        '    throw new Error("boom")',
+        "  },",
+        "})",
+        "",
+      ].join("\n"),
+      Effect.gen(function* () {
+        const plugin = yield* Plugin.Service
+
+        const output: { headers: Record<string, string> } = { headers: { authorization: "Bearer T" } }
+
+        // Mirror what prompt.ts does: catchCause so a throwing plugin doesn't
+        // propagate and abort the tool call.
+        yield* plugin
+          .trigger(
+            "mcp.call.before",
+            { server: "metrics", tool: "query", sessionID: "s", callID: "c" },
+            output,
+          )
+          .pipe(Effect.catchCause(() => Effect.succeed(output)))
+
+        // Whatever the plugin wrote before throwing must still be present
+        expect(output.headers["x-from-plugin"]).toBe("before-throw")
+
+        // Drive those headers through makeMcpFetch
+        const fetchCalls: Array<RequestInit | undefined> = []
+        const stubFetch = async (_url: string | URL, init?: RequestInit) => {
+          fetchCalls.push(init)
+          return new Response("ok")
+        }
+        const wrapped = makeMcpFetch(stubFetch)
+
+        yield* Effect.promise(() =>
+          McpCallContext.run(
+            {
+              server: "metrics",
+              tool: "query",
+              sessionID: "s",
+              callID: "c",
+              headers: output.headers,
+            },
+            () => wrapped("https://example.com/", { headers: { "x-static": "yes" } }),
+          ),
+        )
+
+        expect(fetchCalls.length).toBe(1)
+        expect(fetchCalls[0]?.headers).toEqual({
+          authorization: "Bearer T",
+          "x-from-plugin": "before-throw",
+          "x-static": "yes",
         })
       }),
     ),
