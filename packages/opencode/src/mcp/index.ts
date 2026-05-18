@@ -31,9 +31,20 @@ import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
+import { AsyncLocalStorage } from "node:async_hooks"
 
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
+
+export interface McpCallStore {
+  server: string
+  tool: string
+  sessionID: string
+  callID: string
+  headers: Record<string, string>
+}
+
+export const McpCallContext = new AsyncLocalStorage<McpCallStore>()
 
 const TolerantListToolsResultSchema = ListToolsResultSchema.extend({
   tools: ToolSchema.omit({ outputSchema: true }).array(),
