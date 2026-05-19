@@ -10,9 +10,10 @@ import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 
 import { Plugin } from "@/plugin"
+import { Config } from "@/config/config"
 import type { TaskPromptOps } from "@/tool/task"
 import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
-import { Effect } from "effect"
+import { Cause, Effect } from "effect"
 import { MessageV2 } from "./message-v2"
 import { Session } from "./session"
 import { SessionProcessor } from "./processor"
@@ -40,6 +41,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const registry = yield* ToolRegistry.Service
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
+  const config = yield* Config.Service
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -133,9 +135,61 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
             { args },
           )
+          const meta = (item as { __mcp?: { server: string; tool: string } }).__mcp
+          let mcpHeaders: Record<string, string> | undefined
+          if (meta) {
+            const cfg = yield* config.get()
+            const serverCfg = cfg.mcp?.[meta.server]
+            const staticHeaders: Record<string, string> = {}
+            if (serverCfg && "headers" in serverCfg && serverCfg.headers) {
+              for (const [k, v] of Object.entries(serverCfg.headers)) {
+                staticHeaders[k.toLowerCase()] = v
+              }
+            }
+            const output = { headers: staticHeaders }
+            yield* plugin
+              .trigger(
+                "mcp.call.before",
+                {
+                  server: meta.server,
+                  tool: meta.tool,
+                  sessionID: ctx.sessionID,
+                  callID: opts.toolCallId,
+                },
+                output,
+              )
+              .pipe(
+                Effect.catchCause((cause) => {
+                  log.warn("mcp.call.before plugin failed", {
+                    server: meta.server,
+                    tool: meta.tool,
+                    sessionID: ctx.sessionID,
+                    callID: opts.toolCallId,
+                    error: Cause.pretty(cause),
+                  })
+                  return Effect.void
+                }),
+              )
+            mcpHeaders = output.headers
+          }
+
           const result: Awaited<ReturnType<NonNullable<typeof execute>>> = yield* Effect.gen(function* () {
             yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
-            return yield* Effect.promise(() => execute(args, opts))
+            return yield* Effect.promise(() => {
+              if (mcpHeaders) {
+                return MCP.McpCallContext.run(
+                  {
+                    server: meta!.server,
+                    tool: meta!.tool,
+                    sessionID: ctx.sessionID,
+                    callID: opts.toolCallId,
+                    headers: mcpHeaders,
+                  },
+                  () => execute(args, opts),
+                )
+              }
+              return execute(args, opts)
+            })
           }).pipe(
             Effect.withSpan("Tool.execute", {
               attributes: {
