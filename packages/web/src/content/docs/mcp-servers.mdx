@@ -165,6 +165,25 @@ These headers are static — they are resolved once when the config is loaded an
 
 ---
 
+### Per-call headers
+
+The `headers` above are static — resolved once at config load. For headers that need to vary per tool call (the current `sessionID`, a fresh bearer token, a per-user identity from your environment), use the [`mcp.call.before`](/plugins#mcp-events) plugin hook:
+
+```ts title=".opencode/plugins/mcp-forward-session.ts"
+import type { Plugin } from "@opencode-ai/plugin"
+
+export const McpForwardSession: Plugin = async () => ({
+  "mcp.call.before": async (input, output) => {
+    output.headers["x-opencode-session-id"] = input.sessionID
+    output.headers["x-opencode-call-id"] = input.callID
+  },
+})
+```
+
+Register the plugin in your `opencode.json`'s `"plugin"` array. The hook fires only for `callTool` on remote (HTTP/SSE) transports; stdio MCP servers and SDK handshake traffic are unaffected, so per-call values never leak into OAuth probes.
+
+---
+
 ## OAuth
 
 OpenCode automatically handles OAuth authentication for remote MCP servers. When a server requires authentication, OpenCode will:
