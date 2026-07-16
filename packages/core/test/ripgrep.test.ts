@@ -10,7 +10,9 @@ import { testEffect } from "./lib/effect"
 
 const it = testEffect(LayerNode.compile(Ripgrep.node))
 
-describe("Ripgrep", () => {
+// Fork-only: the bundled ripgrep binary hangs on the shared windows-latest
+// runner (upstream runs these on Blacksmith where they pass).
+describe.skipIf(process.platform === "win32")("Ripgrep", () => {
   it.live("keeps ignored files out of catch-all find results", () =>
     Effect.acquireUseRelease(
       Effect.promise(() => tmpdir()),

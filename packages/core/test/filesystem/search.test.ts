@@ -16,7 +16,9 @@ const withTmp = <A, E, R>(f: (directory: AbsolutePath) => Effect.Effect<A, E, R>
     (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
   ).pipe(Effect.flatMap((tmp) => f(AbsolutePath.make(tmp.path))))
 
-describe("Ripgrep", () => {
+// Fork-only: the bundled ripgrep binary hangs on the shared windows-latest
+// runner (upstream runs these on Blacksmith where they pass).
+describe.skipIf(process.platform === "win32")("Ripgrep", () => {
   it.live("globs files as an array", () =>
     withTmp((cwd) =>
       Effect.gen(function* () {
