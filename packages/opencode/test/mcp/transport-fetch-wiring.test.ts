@@ -1,6 +1,7 @@
 import { describe, expect, mock, beforeEach } from "bun:test"
 import { Effect } from "effect"
 import { testEffect } from "../lib/effect"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 
 const transportFetchOptions: Array<{ type: "streamable" | "sse"; fetch?: unknown }> = []
 
@@ -31,7 +32,7 @@ beforeEach(() => {
 })
 
 const { MCP } = await import("../../src/mcp/index")
-const it = testEffect(MCP.defaultLayer)
+const it = testEffect(LayerNode.compile(MCP.node))
 
 describe("mcp transport fetch wiring", () => {
   it.instance("both StreamableHTTP and SSE transports receive a fetch wrapper", () =>

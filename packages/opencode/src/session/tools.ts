@@ -430,16 +430,15 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 output,
               )
               .pipe(
-                Effect.catchCause((cause) => {
-                  log.warn("mcp.call.before plugin failed", {
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("mcp.call.before plugin failed", {
                     server: meta.server,
                     tool: meta.tool,
                     sessionID: ctx.sessionID,
                     callID: opts.toolCallId,
                     error: Cause.pretty(cause),
-                  })
-                  return Effect.void
-                }),
+                  }),
+                ),
               )
             mcpHeaders = output.headers
           }
